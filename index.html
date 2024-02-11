@@ -74,7 +74,7 @@
     <script>
       document.getElementById('form').addEventListener('submit', function(event) {
         event.preventDefault();
-        var url = document.getElementById('link').value;
+        var url = document.getElementById('link').value.split('#')[0];
         var eventBusesAdminToken = url.split("?")[1].split("&").find(function(param) { return param.split("=")[0] === "t"; }).split("=")[1];
         fetch(url.split("/").slice(0, 3).join("/") + "/controller/AJAX_eventBuses.php", {
           method: "POST",
@@ -100,18 +100,25 @@
                 "<th>תחנות</th>" +
                 "<th>זמני עצירה</th>" +
                 "<th>מנהל</th>" +
+                "<th>נעול</th>" +
                 "<th>ממתינים</th>" +
                 "<th>לא אושרו</th>" +
-                "<th>שולם</th>"
+                "<th>שולם</th>" +
+                "<th>קישור ניהול</th>" +
+                "<th>קישור רישום</th>"
               "</tr>";
 
-              function findMatchByAction(selector, action, remove, parent) {
+              function findMatchByAction(selector, action, remove, getElement, parent) {
                 var elements = (parent || busElement).getElementsByTagName(selector);
                 for (var el of elements) {
-                  if (el.outerHTML.indexOf(action) > 0 && el.innerText.indexOf(remove) > 0) {
-                    var innerMatch = findMatchByAction(selector, action, remove, el);
+                  if (el.outerHTML.indexOf(action) > 0 && (!remove || el.innerText.indexOf(remove) > 0)) {
+                    var innerMatch = findMatchByAction(selector, action, remove, getElement, el);
                     if (innerMatch) {
                       return innerMatch;
+                    }
+
+                    if (getElement) {
+                      return el;
                     }
 
                     var result = el.innerText;
@@ -128,7 +135,8 @@
                 var busElement = busElements[i];
                 var busNumber = busElement.getElementsByClassName('plate')[0].innerText;
                 var passengers = findMatchByAction('button', 'openBusJoiner', 'נוסעים');
-                var line = findMatchByAction('div', 'fas fa-bus-alt', 'קו') || findMatchByAction('div', 'fas fa-lock', 'קו');
+                var line = findMatchByAction('div', 'fas fa-bus-alt', 'קו');
+                var lockedLine = findMatchByAction('div', 'fas fa-lock', 'קו');
                 var stops = [];
                 var stopsTimes = [];
                 for (var a of busElement.getElementsByTagName('a')) {
@@ -142,16 +150,24 @@
                 var waiting = findMatchByAction('button', 'openBusStandbyModal', 'ממתינים');
                 var notApproved = findMatchByAction('button', 'openBusNotApprovedModal', 'טרם אושרו');
                 var moneyPaid = findMatchByAction('div', 'שולם:', 'שולם:').split('|')[0].trim();
+                
+                var manageLinkEl = findMatchByAction('a', '/eventBus?t=', null, true);
+                var manageLink = manageLinkEl ? '<a href="' + manageLinkEl.href + '" target="_blank">ניהול</a>' : '';
+                var registerLinkEl = findMatchByAction('a', '/bus?k=', null, true);
+                var registerLink = registerLinkEl ? '<a href="' + registerLinkEl.href + '" target="_blank">רישום</a>' : '';
 
                 var tr = document.createElement('tr');
                 tr.innerHTML = "<td>" + busNumber + "</td><td>" + passengers + "</td>" + 
-                  "<td>" + line + "</td>" +
+                  "<td>" + (line || lockedLine) + "</td>" +
                   "<td>" + stops.join("<br>\n") + "</td>" +
                   "<td>" + stopsTimes.join("<br>\n") + "</td>" +
                   "<td>" + manager + "</td>" +
+                  "<td>" + (lockedLine ? "נעול לרישום" : "") + "</td>" +
                   "<td>" + waiting + "</td>" +
                   "<td>" + notApproved + "</td>" +
-                  "<td>" + moneyPaid + "</td>";
+                  "<td>" + moneyPaid + "</td>" +
+                  "<td>" + manageLink + "</td>" +
+                  "<td>" + registerLink + "</td>";
                 tbody.appendChild(tr);
               }
               document.getElementById('wrap').innerHTML = "";
