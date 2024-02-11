@@ -80,37 +80,92 @@
           method: "POST",
           body: new URLSearchParams({ eventBusesAdminToken })
         })
-        .then(response => {
+        .then(function (response) {
           response.text().then(function (html) {
-            var parser = new DOMParser();
-            var doc = parser.parseFromString(html, "text/html");
-            var buses = doc.getElementById('buses');
-            var busElements = buses.getElementsByClassName('list-group-item');
-            var table = document.createElement('table');
-            var thead = document.createElement('thead');
-            var tbody = document.createElement('tbody');
-            table.appendChild(thead);
-            table.appendChild(tbody);
-            thead.innerHTML = "<tr><th>מספר אוטובוס</th><th>מספר נוסעים</th></tr>";
-            for (var i = 0; i < busElements.length; i++) {
-              var busElement = busElements[i];
-              var busNumber = busElement.getElementsByClassName('plate')[0].innerText;
-              var passengers = "";
-              for (var btn of busElement.getElementsByClassName('btn-primary')) {
-                if (btn.outerHTML.indexOf('openBusJoiner') > 0) {
-                  passengers = btn.innerText.replace('נוסעים', '').trim();
+            try {
+              var parser = new DOMParser();
+              var doc = parser.parseFromString(html, "text/html");
+              var buses = doc.getElementById('buses');
+              var busElements = buses.getElementsByClassName('list-group-item');
+              var table = document.createElement('table');
+              var thead = document.createElement('thead');
+              var tbody = document.createElement('tbody');
+              table.appendChild(thead);
+              table.appendChild(tbody);
+
+              thead.innerHTML = "<tr>" +
+                "<th>מספר אוטובוס</th>" +
+                "<th>מספר נוסעים</th>" + 
+                "<th>שם קו</th>" +
+                "<th>תחנות</th>" +
+                "<th>זמני עצירה</th>" +
+                "<th>מנהל</th>" +
+                "<th>ממתינים</th>" +
+                "<th>לא אושרו</th>" +
+                "<th>שולם</th>"
+              "</tr>";
+
+              function findMatchByAction(selector, action, remove, parent) {
+                var elements = (parent || busElement).getElementsByTagName(selector);
+                for (var el of elements) {
+                  if (el.outerHTML.indexOf(action) > 0 && el.innerText.indexOf(remove) > 0) {
+                    var innerMatch = findMatchByAction(selector, action, remove, el);
+                    if (innerMatch) {
+                      return innerMatch;
+                    }
+
+                    var result = el.innerText;
+                    if (remove) {
+                      result = result.replace(remove, '');
+                    }
+                    return result.trim();
+                  }
                 }
+                return '';
               }
-              var tr = document.createElement('tr');
-              tr.innerHTML = "<td>" + busNumber + "</td><td>" + passengers + "</td>";
-              tbody.appendChild(tr);
+
+              for (var i = 0; i < busElements.length; i++) {
+                var busElement = busElements[i];
+                var busNumber = busElement.getElementsByClassName('plate')[0].innerText;
+                var passengers = findMatchByAction('button', 'openBusJoiner', 'נוסעים');
+                var line = findMatchByAction('div', 'fas fa-bus-alt', 'קו') || findMatchByAction('div', 'fas fa-lock', 'קו');
+                var stops = [];
+                var stopsTimes = [];
+                for (var a of busElement.getElementsByTagName('a')) {
+                  if (a.href.indexOf("/eventBus?t=") > 0) {
+                    var span = a.getElementsByTagName('span')[0];
+                    stopsTimes.push(span.firstChild.innerText.trim());
+                    stops.push(span.lastChild.textContent.trim());
+                  }
+                }
+                var manager = findMatchByAction('div', 'אחראי קו', 'אחראי קו');
+                var waiting = findMatchByAction('button', 'openBusStandbyModal', 'ממתינים');
+                var notApproved = findMatchByAction('button', 'openBusNotApprovedModal', 'טרם אושרו');
+                var moneyPaid = findMatchByAction('div', 'שולם:', 'שולם:').split('|')[0].trim();
+
+                var tr = document.createElement('tr');
+                tr.innerHTML = "<td>" + busNumber + "</td><td>" + passengers + "</td>" + 
+                  "<td>" + line + "</td>" +
+                  "<td>" + stops.join("<br>\n") + "</td>" +
+                  "<td>" + stopsTimes.join("<br>\n") + "</td>" +
+                  "<td>" + manager + "</td>" +
+                  "<td>" + waiting + "</td>" +
+                  "<td>" + notApproved + "</td>" +
+                  "<td>" + moneyPaid + "</td>";
+                tbody.appendChild(tr);
+              }
+              document.getElementById('wrap').innerHTML = "";
+              document.getElementById('wrap').appendChild(table);
             }
-            document.getElementById('wrap').innerHTML = "";
-            document.getElementById('wrap').appendChild(table);
+            catch (e) {
+              console.error("Error parsing HTML:", e);
+              alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
+            }
           });
         })
-        .catch(error => {
+        .catch(function(error) {
           console.error("Error making POST request:", error);
+          alert('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
         });
         return false;
       });
