@@ -38,7 +38,8 @@ function log(data) {
   el.innerHTML = data;
   var log = document.getElementById('log');
   if (log) {
-    log.insertBefore(el, log.firstChild);
+    log.appendChild(el);
+    log.scrollIntoView(false);
   }
   else {
     console.log(data);
@@ -350,9 +351,15 @@ function fixDonors(donors) {
     donor["Name"] = donor["Donor First Name"] + " " + donor["Donor Last Name"];
     delete donor["Donor First Name"];
     delete donor["Donor Last Name"];
-    donor["Phone"] = '0' + donor["Donor Phone Number"];
-    donor.Phone = donor.Phone.replace(/(\d{3})(\d{7})/, '$1-$2');
+    donor.Phone = donor["Donor Phone Number"];
     delete donor["Donor Phone Number"];
+    if (donor.Phone.startsWith('+972')) {
+      donor.Phone = donor.Phone.replace('+972', '0');
+    }
+    else {
+      donor.Phone = '0' + donor.Phone;
+    }
+    donor.Phone = donor.Phone.replace(/(\d{3})(\d{7})/, '$1-$2');
     donor["Email"] = donor["Donor Email"];
     delete donor["Donor Email"];
     donor["Date"] = donor["Transfer Date"];
@@ -385,7 +392,7 @@ function checkPaid(url, donors, passengers) {
   for (var i = 0; i < donors.length; i++) {
     var donor = donors[i];
     log('סנכרון תשלום עבור: ' + (i + 1) + ' מתוך ' + donors.length + ' - ' + donor.Name + ' - ' + donor.Amount + '₪');
-    var quantity = parseInt(donor.Amount / 30);
+    var quantity = parseInt(Math.round(donor.Amount / 30));
     var matches = passengers.filter(function (p) {
       return p.phone === donor.Phone;
     });
@@ -398,28 +405,28 @@ function checkPaid(url, donors, passengers) {
     if (matches.length) {
       if (matches.length > quantity) {
         donor.Status = "נמצאו יותר מדי נוסעים";
-        log('נמצאו יותר מדי נוסעים עבור: ' + donor.Name);
+        log('נמצאו יותר מדי נוסעים עבור: ' + donor.Name + ' - ' + matches.length + ' נוסעים. מסמן רק ' + quantity);
+        matches = matches.slice(0, quantity);
       }
-      else {
-        matches.forEach(function (match) {
-          if (match.paid > 0) {
-            donor.Status = "כבר סומן";
-            log('כבר סומן עבור: ' + donor.Name);
-          }
-          else {
-            donor.Status = "נמצא";
-            log('נמצא ומסמן תשלום עבור: ' + donor.Name);
-            calls.push(function() {
-              match.paid = 30;
-              return markPaid(url, match.busToken, match.token, 30);
-            });
-          }
-        });
-      }
+
+      matches.forEach(function (match) {
+        if (match.paid > 0) {
+          donor.Status = "כבר סומן";
+          log('כבר סומן עבור: ' + donor.Name);
+        }
+        else {
+          donor.Status = "נמצא";
+          log('נמצא ומסמן תשלום עבור: ' + donor.Name);
+          calls.push(function() {
+            match.paid = 30;
+            return markPaid(url, match.token, donor.Amount);
+          });
+        }
+      });
     }
     else {
       donor.Status = "לא נמצא";
-      log('לא נמצא נוסע עבור: ' + donor.Name);
+      log('*** לא נמצא נוסע עבור: ' + donor.Name);
     }
   }
   var index = 0;
@@ -441,7 +448,7 @@ function checkPaid(url, donors, passengers) {
     if (calls.length) {
       log('הסתיים. בוצעו ' + calls.length + ' קריאות');
       var link = cache('link');
-      //sessionStorage.clear(); // TODO: Uncomment
+      sessionStorage.clear();
       cache('link', link);
     }
     else {
