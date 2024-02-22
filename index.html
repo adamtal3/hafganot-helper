@@ -4,59 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ניהול הסעות - חילוץ מידע</title>
-    <style>
-      body {
-        font: 16px Arial, sans-serif;
-        margin: 0;
-        text-align: center;
-        direction: rtl;
-        font-size: 1.2em;
-      }
-      .form {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 40px;
-        background-color: #f4f4f4;
-        height: 100vh;
-      }
-      .form input {
-        width: 300px;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        font-size: 16px;
-        width: 65vw;
-        text-align: center;
-        direction: ltr;
-        margin: 10px 0 0 0;
-        font-weight: bold;
-      }
-      .form button {
-        margin-top: 10px;
-        padding: 10px 20px;
-        background-color: #007bff;
-        color: #fff;
-        border: none;
-        border-radius: 5px;
-        font-size: 16px;
-        cursor: pointer;
-      }
-      .form button:hover {
-        background-color: #0056b3;
-      }
-      table {
-        margin: 10px;
-        border-collapse: collapse;
-        width: auto;
-        text-align: center;
-        border: 1px solid #ddd;
-      }
-      table tr td, table tr th {
-        padding: 2px 8px;
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <div id="wrap">
@@ -66,125 +14,34 @@
             <h1>ניהול הסעות - חילוץ מידע</h1>
           </header>
           <label>הזן קישור ניהול ראשי (הוא לא ישמר בשום מקום):</label>
-          <input type="text" id="link" />
+          <input type="text" id="link" required />
           <button type="submit">קבל מידע</button>
+          <section class="log">
+            <div id="log"><br/></div>
+          </section>
         </form>
       </main>
     </div>
+    <script src="./app.js"></script>
     <script>
       document.getElementById('form').addEventListener('submit', function(event) {
         event.preventDefault();
         var url = document.getElementById('link').value.split('#')[0];
-        var eventBusesAdminToken = url.split("?")[1].split("&").find(function(param) { return param.split("=")[0] === "t"; }).split("=")[1];
-        fetch(url.split("/").slice(0, 3).join("/") + "/controller/AJAX_eventBuses.php", {
-          method: "POST",
-          body: new URLSearchParams({ eventBusesAdminToken })
-        })
-        .then(function (response) {
-          response.text().then(function (html) {
-            try {
-              var parser = new DOMParser();
-              var doc = parser.parseFromString(html, "text/html");
-              var buses = doc.getElementById('buses');
-              var busElements = buses.getElementsByClassName('list-group-item');
-              var table = document.createElement('table');
-              var thead = document.createElement('thead');
-              var tbody = document.createElement('tbody');
-              table.appendChild(thead);
-              table.appendChild(tbody);
+        cache('link', url);
 
-              thead.innerHTML = "<tr>" +
-                "<th>מספר אוטובוס</th>" +
-                "<th>מספר נוסעים</th>" + 
-                "<th>שם קו</th>" +
-                "<th>תחנות</th>" +
-                "<th>זמני עצירה</th>" +
-                "<th>מנהל</th>" +
-                "<th>נעול</th>" +
-                "<th>ממתינים</th>" +
-                "<th>לא אושרו</th>" +
-                "<th>שולם</th>" +
-                "<th>קישור ניהול</th>" +
-                "<th>קישור רישום</th>"
-              "</tr>";
+        getLines(url).then(function (lines) {
+          var table = toTable(lines);
 
-              function findMatchByAction(selector, action, remove, getElement, parent) {
-                var elements = (parent || busElement).getElementsByTagName(selector);
-                for (var el of elements) {
-                  if (el.outerHTML.indexOf(action) > 0 && (!remove || el.innerText.indexOf(remove) > 0)) {
-                    var innerMatch = findMatchByAction(selector, action, remove, getElement, el);
-                    if (innerMatch) {
-                      return innerMatch;
-                    }
-
-                    if (getElement) {
-                      return el;
-                    }
-
-                    var result = el.innerText;
-                    if (remove) {
-                      result = result.replace(remove, '');
-                    }
-                    return result.trim();
-                  }
-                }
-                return '';
-              }
-
-              for (var i = 0; i < busElements.length; i++) {
-                var busElement = busElements[i];
-                var busNumber = busElement.getElementsByClassName('plate')[0].innerText;
-                var passengers = findMatchByAction('button', 'openBusJoiner', 'נוסעים');
-                var line = findMatchByAction('div', 'fas fa-bus-alt', 'קו');
-                var lockedLine = findMatchByAction('div', 'fas fa-lock', 'קו');
-                var stops = [];
-                var stopsTimes = [];
-                for (var a of busElement.getElementsByTagName('a')) {
-                  if (a.href.indexOf("/eventBus?t=") > 0) {
-                    var span = a.getElementsByTagName('span')[0];
-                    stopsTimes.push(span.firstChild.innerText.trim());
-                    stops.push(span.lastChild.textContent.trim());
-                  }
-                }
-                var manager = findMatchByAction('div', 'אחראי קו', 'אחראי קו');
-                var waiting = findMatchByAction('button', 'openBusStandbyModal', 'ממתינים');
-                var notApproved = findMatchByAction('button', 'openBusNotApprovedModal', 'טרם אושרו');
-                var moneyPaid = findMatchByAction('div', 'שולם:', 'שולם:').split('|')[0].trim();
-                
-                var manageLinkEl = findMatchByAction('a', '/eventBus?t=', null, true);
-                var manageLink = manageLinkEl ? '<a href="' + manageLinkEl.href + '" target="_blank">ניהול</a>' : '';
-                var registerLinkEl = findMatchByAction('a', '/bus?k=', null, true);
-                var registerLink = registerLinkEl ? '<a href="' + registerLinkEl.href + '" target="_blank">רישום</a>' : '';
-
-                var tr = document.createElement('tr');
-                tr.innerHTML = "<td>" + busNumber + "</td><td>" + passengers + "</td>" + 
-                  "<td>" + (line || lockedLine) + "</td>" +
-                  "<td>" + stops.join("<br>\n") + "</td>" +
-                  "<td>" + stopsTimes.join("<br>\n") + "</td>" +
-                  "<td>" + manager + "</td>" +
-                  "<td>" + (lockedLine ? "נעול לרישום" : "") + "</td>" +
-                  "<td>" + waiting + "</td>" +
-                  "<td>" + notApproved + "</td>" +
-                  "<td>" + moneyPaid + "</td>" +
-                  "<td>" + manageLink + "</td>" +
-                  "<td>" + registerLink + "</td>";
-                tbody.appendChild(tr);
-              }
-              document.getElementById('wrap').innerHTML = "";
-              document.getElementById('wrap').appendChild(table);
-            }
-            catch (e) {
-              console.error("Error parsing HTML:", e);
-              alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
-            }
-          });
-        })
-        .catch(function(error) {
-          console.error("Error making POST request:", error);
-          alert('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
+          document.getElementById('wrap').innerHTML = "";
+          document.getElementById('wrap').appendChild(table);
         });
+
         return false;
       });
+      var cachedLink = cache('link');
+      if (cachedLink) {
+        document.getElementById('link').value = cachedLink;
+      }
     </script>
   </body>
 </html>

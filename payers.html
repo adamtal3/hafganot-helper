@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ניהול הסעות - עדכון משלמים</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="wrap">
+      <main>
+        <form id="form" class="form">
+          <header>
+            <h1>ניהול הסעות - עדכון משלמים</h1>
+          </header>
+          <label>קובץ תורמים:</label>
+          <input type="file" id="file" required />
+          <br/>
+          <label>קישור ניהול ראשי:</label>
+          <input type="text" id="link" required />
+          <button type="submit">קבל מידע</button>
+          <section class="log">
+            <div id="log"><br/></div>
+          </section>
+        </form>
+      </main>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/jszip.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/xlsx.js"></script>
+    <script src="./app.js"></script>
+    <script>
+      document.getElementById('form').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        var file = document.getElementById('file').files[0];
+        var url = document.getElementById('link').value.split('#')[0];
+        cache('link', url);
+
+        parseExcel(file).then(function (sheets) {
+          var donors = sheets[0];
+          donors = fixDonors(donors);
+
+          getLines(url).then(function (lines) {
+            var stops = getStops(lines);
+              document.getElementById('wrap').appendChild(toH1('קווים'));
+              document.getElementById('wrap').appendChild(toTable(lines));
+              document.getElementById('wrap').appendChild(toH1('תחנות'));
+              document.getElementById('wrap').appendChild(toTable(stops));
+            getPassengers(url, stops).then(function (passengers) {
+              document.getElementById('wrap').appendChild(toH1('נוסעים'));
+              document.getElementById('wrap').appendChild(toTable(passengers));
+              checkPaid(url, donors, passengers).then(function (donors) {
+                document.getElementById('wrap').appendChild(toH1('תורמים'));
+                document.getElementById('wrap').appendChild(toTable(donors));
+              });
+            });
+          });
+        });
+
+        return false;
+      });
+
+      var cachedLink = cache('link');
+      if (cachedLink) {
+        document.getElementById('link').value = cachedLink;
+      }
+    </script>
+  </body>
+</html>
