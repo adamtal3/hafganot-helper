@@ -84,6 +84,14 @@ function parse(html) {
   return parser.parseFromString(html, "text/html");
 }
 
+function whatsappLink(phone, text) {
+  phone = phone.replace(/-/g, '').replace(/ /g, '');
+  if (phone.startsWith('0')) phone = '+972' + phone.substring(1);
+  else if (phone.startsWith('972')) phone = '+' + phone;
+  else if (phone.startsWith('5')) phone = '+972' + phone;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+}
+
 function getLines(url) {
   let cached = cache(url);
   if (cached) return Promise.resolve(cached);
@@ -118,23 +126,35 @@ function getLines(url) {
               );
             }
           }
-          var manager = findMatchByAction(busElement, 'div', 'אחראי קו', 'אחראי קו');
-          var waiting = findMatchByAction(busElement, 'button', 'openBusStandbyModal', 'ממתינים');
-          var notApproved = findMatchByAction(busElement, 'button', 'openBusNotApprovedModal', 'טרם אושרו');
-          var moneyPaid = findMatchByAction(busElement, 'div', 'שולם:', 'שולם:').split('|')[0].trim();
           
           var manageLinkEl = findMatchByAction(busElement, 'a', '/eventBus?t=', null, true);
           var manageLink = manageLinkEl ? '<a href="' + manageLinkEl.href + '" target="_blank">ניהול</a>' : '';
           var registerLinkEl = findMatchByAction(busElement, 'a', '/bus?k=', null, true);
           var registerLink = registerLinkEl ? '<a href="' + registerLinkEl.href + '" target="_blank">רישום</a>' : '';
 
+          var manager = findMatchByAction(busElement, 'div', 'אחראי קו', 'אחראי קו');
+          var managerPhone = manager.split(' ');
+          managerPhone = managerPhone[managerPhone.length - 1];
+          manager = manager.replace(managerPhone, '<a href="' + whatsappLink(managerPhone, 'שלום ' + manager.split(' ')[0] + ', אני מצוות ניהול ההסעות. הוגדרת להובלה על קו ' + (line || lockedLine) + '.\nקישור ניהול: ' + manageLinkEl.href) + '" target="_blank">' + managerPhone + '</a>');
+          var waiting = findMatchByAction(busElement, 'button', 'openBusStandbyModal', 'ממתינים');
+          var notApproved = findMatchByAction(busElement, 'button', 'openBusNotApprovedModal', 'טרם אושרו');
+          var moneyPaid = findMatchByAction(busElement, 'div', 'שולם:', 'שולם:').split('|')[0].trim();
+          var seats = findMatchByAction(busElement, 'div', 'מקס׳ מקומות:', 'מקס׳ מקומות:').split('|')[0].trim();
+          
           lines.push({
-            "מספר אוטובוס": busNumber,
-            "מספר נוסעים": passengers,
+            "מספר אוטובוס": '<div style="font-size: 22pt;">' + busNumber + '</div>',
+            "מספר נוסעים": passengers < 10 ? '<div style="background-color: #ff000070; font-size: 20pt;">' + passengers + '</div>' : (
+              passengers < 20 ? '<div style="background-color: #ffa50070; font-size: 20pt;">' + passengers + '</div>' : (
+                passengers < 25 ? '<div style="background-color: #ffff0070; font-size: 20pt;">' + passengers + '</div>' : 
+                  '<div style="background-color: #00ff0070; font-size: 20pt;">' + passengers + '</div>'
+              )
+            ),
+            "מקס' מקומות": seats > 20 ? '<div style="background-color: #70cfcf70;">' + seats + '</div>' : (
+              '<div style="background-color: #cf70ce7d;">' + seats + '</div>'),
             "שם קו": line || lockedLine,
             "תחנות": stops.join("\n<br/>"),
             "זמני עצירה": stopsTimes.join("\n<br/>"),
-            "מנהל": manager,
+            "מוביל": manager,
             "נעול": lockedLine ? "נעול לרישום" : "",
             "ממתינים": waiting,
             "לא אושרו": notApproved,
@@ -143,6 +163,14 @@ function getLines(url) {
             "קישור רישום": registerLink
           });
         }
+
+        var busNum = function (html) {
+          return parseInt(html.replace(/<[^>]+>/g, ''));
+        }
+
+        lines.sort(function (a, b) {
+          return busNum(a["מספר אוטובוס"]) - busNum(b["מספר אוטובוס"]);
+        });
 
         log('נמצאו ' + lines.length + ' קווים');
         cache(url, lines);

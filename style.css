@@ -30,14 +30,31 @@ body {
 .form button {
   margin-top: 10px;
   padding: 10px 20px;
-  background-color: #007bff;
-  color: #fff;
   border: none;
   border-radius: 5px;
   font-size: 16px;
   cursor: pointer;
+  background-color: #a4a4a4;
 }
 .form button:hover {
+  background-color: #f4f4f4;
+}
+.form button.clear-cache {
+  position: absolute;
+  left: 10px;
+  top: 200px;
+}
+.form .to-payers {
+  position: absolute;
+  left: 10px;
+  top: 300px;
+}
+.form button[type=submit] {
+  background-color: #007bff;
+  color: #fff;
+
+}
+.form button[type=submit]:hover {
   background-color: #0056b3;
 }
 table {
