@@ -93,8 +93,8 @@ function whatsappLink(phone, text) {
 }
 
 function getLines(url) {
-  let cached = cache(url);
-  if (cached) return Promise.resolve(cached);
+  //let cached = cache(url);
+  //if (cached) return Promise.resolve(cached);
   var eventBusesAdminToken = url.split("?")[1].split("&").find(function(param) { return param.split("=")[0] === "t"; }).split("=")[1];
   var origin = url.split("/").slice(0, 3).join("/");
   return fetch(origin + "/controller/AJAX_eventBuses.php", {
@@ -156,8 +156,8 @@ function getLines(url) {
             "זמני עצירה": stopsTimes.join("\n<br/>"),
             "מוביל": manager,
             "נעול": lockedLine ? "נעול לרישום" : "",
-            "ממתינים": waiting,
-            "לא אושרו": notApproved,
+            "ממתינים": waiting > 0 ? '<div style="background-color: #33333340;">' + waiting + '</div>' : "",
+            "לא אושרו": notApproved > 0 ? '<div style="background-color: #aaaaaa40;">' + notApproved + '</div>' : "",
             "שולם": moneyPaid,
             "קישור ניהול": manageLink,
             "קישור רישום": registerLink
