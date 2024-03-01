@@ -156,8 +156,8 @@ function getLines(url) {
             "זמני עצירה": stopsTimes.join("\n<br/>"),
             "מוביל": manager,
             "נעול": lockedLine ? "נעול לרישום" : "",
-            "ממתינים": waiting > 0 ? '<div style="background-color: #33333340;">' + waiting + '</div>' : "",
-            "לא אושרו": notApproved > 0 ? '<div style="background-color: #aaaaaa40;">' + notApproved + '</div>' : "",
+            "ממתינים": waiting > 0 ? '<div style="background-color: #d3d3d3d3;">' + waiting + '</div>' : "",
+            "לא אושרו": notApproved > 0 ? '<div style="background-color: #d3d3d3d3;">' + notApproved + '</div>' : "",
             "שולם": moneyPaid,
             "קישור ניהול": manageLink,
             "קישור רישום": registerLink
