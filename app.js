@@ -45,6 +45,19 @@ function log(data) {
     console.log(data);
   }
 }
+function progress(current, total) {
+  var progress = document.getElementById('progress');
+  if (progress) {
+    progress.style.width = parseInt(current / total * 100) + '%';
+    progress.style.backgroundColor = 'lightgreen';
+    progress.style.alignSelf = 'flex-start';
+    progress.style.padding = '2px';
+    progress.style.borderRadius = '10px';
+    progress.style.textAlign = 'center';
+    progress.style.fontWeight = 'bold';
+    progress.innerText = parseInt(current / total * 100) + '%';
+  }
+}
 
 function cache(key, value) {
   if (value) {
@@ -192,6 +205,10 @@ function getLines(url) {
 }
 
 function parseExcel(file) {
+  if (!file) {
+    console.error("No file provided");
+    return Promise.resolve([[]]);
+  }
   return new Promise(function (resolve, reject) {
     var reader = new FileReader();
     reader.onload = function(e) {
@@ -461,6 +478,7 @@ function checkPaid(url, donors, passengers) {
   function runNext() {
     if (index < calls.length) {
       return calls[index++]().then(function() {
+        progress(index, calls.length);
         return new Promise(function (resolve, reject) {
           setTimeout(function () {
             resolve(runNext());
@@ -472,6 +490,7 @@ function checkPaid(url, donors, passengers) {
       return Promise.resolve(donors);
     }
   }
+  log('מתחיל תהליך סימון אוטומטי ...');
   return runNext().then(function () {
     if (calls.length) {
       log('הסתיים. בוצעו ' + calls.length + ' קריאות');
