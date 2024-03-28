@@ -33,6 +33,33 @@ function toTable(data) {
   return table;
 }
 
+function stripHtml(html) {
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
+}
+
+function boldIfNot(text, not) {
+  return text === not ? text : '<b>' + text + '</b>';
+}
+
+function toOrder(data) {
+  var order = [];
+
+  for (var i = 0; i < data.length; i++) {
+    var line = data[i];
+    order.push({
+      "מספר": stripHtml(line["מספר"]),
+      "סוג": boldIfNot(stripHtml(line["סוג"]), 'אוטובוס'),
+      "שעת התייצבות": stripHtml(line["זמני עצירה"].split('\n')[0]),
+      "שם קו": stripHtml(line["שם קו"]),
+      "תחנות": stripHtml(line["תחנות"].split('\n').join(', ')),
+      "מוביל": stripHtml(line["מוביל"])
+    });
+  }
+
+  return order;
+}
+
 function log(data) {
   var el = document.createElement('div');
   el.innerHTML = data;
@@ -155,13 +182,16 @@ function getLines(url) {
           var seats = findMatchByAction(busElement, 'div', 'מקס׳ מקומות:', 'מקס׳ מקומות:').split('|')[0].trim();
           
           lines.push({
-            "מספר אוטובוס": '<div style="font-size: 22pt;">' + busNumber + '</div>',
-            "מספר נוסעים": passengers < 10 ? '<div style="background-color: #ff000070; font-size: 20pt;">' + passengers + '</div>' : (
+            "מספר": '<div style="font-size: 22pt;">' + busNumber + '</div>',
+            "רשומים": passengers < 10 ? '<div style="background-color: #ff000070; font-size: 20pt;">' + passengers + '</div>' : (
               passengers < 20 ? '<div style="background-color: #ffa50070; font-size: 20pt;">' + passengers + '</div>' : (
                 passengers < 25 ? '<div style="background-color: #ffff0070; font-size: 20pt;">' + passengers + '</div>' : 
                   '<div style="background-color: #00ff0070; font-size: 20pt;">' + passengers + '</div>'
               )
             ),
+            "סוג": seats < 2 ? '' : (seats > 20 ? 
+              '<div style="background-color: #70cfcf70;">אוטובוס</div>' : (
+              '<div style="background-color: #cf70ce7d;">מיניבוס</div>')),
             "מקס' מקומות": seats > 20 ? '<div style="background-color: #70cfcf70;">' + seats + '</div>' : (
               '<div style="background-color: #cf70ce7d;">' + seats + '</div>'),
             "שם קו": line || lockedLine,
@@ -178,7 +208,7 @@ function getLines(url) {
         }
 
         var busNum = function (html) {
-          return parseInt(html.replace(/<[^>]+>/g, ''));
+          return html ? parseInt(html.replace(/<[^>]+>/g, '')) : 0;
         }
 
         lines.sort(function (a, b) {

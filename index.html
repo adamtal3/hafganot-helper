@@ -15,7 +15,8 @@
           </header>
           <label>הזן קישור ניהול ראשי (הוא לא ישמר בשום מקום):</label>
           <input type="text" id="link" required />
-          <button type="submit">קבל מידע</button>
+          <button type="submit">קבל מידע</button><br/>
+          <button type="button" id="order-table">טבלת הזמנת אוטובוסים</button>
           <button type="button" class="clear-cache" onclick="sessionStorage.clear();">ניקוי מטמון</button>
           <a class="to-payers" href="./payers.html">לעדכון משלמשים אוטומטי</a>
           <section class="log">
@@ -34,6 +35,20 @@
 
         getLines(url).then(function (lines) {
           var table = toTable(lines);
+
+          document.getElementById('wrap').innerHTML = "";
+          document.getElementById('wrap').appendChild(table);
+        });
+
+        return false;
+      });
+      document.getElementById('order-table').addEventListener('click', function(event) {
+        event.preventDefault();
+        var url = document.getElementById('link').value.split('#')[0];
+        cache('link', url);
+
+        getLines(url).then(function (lines) {
+          var table = toTable(toOrder(lines));
 
           document.getElementById('wrap').innerHTML = "";
           document.getElementById('wrap').appendChild(table);
