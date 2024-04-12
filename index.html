@@ -48,10 +48,12 @@
         cache('link', url);
 
         getLines(url).then(function (lines) {
-          var table = toTable(toOrder(lines));
+          addStopDetails(url, lines).then(function (lines2) {
+            var table = toTable(toOrder(lines2));
 
-          document.getElementById('wrap').innerHTML = "";
-          document.getElementById('wrap').appendChild(table);
+            document.getElementById('wrap').innerHTML = "";
+            document.getElementById('wrap').appendChild(table);
+          });
         });
 
         return false;

@@ -52,7 +52,7 @@ function toOrder(data) {
       "סוג": boldIfNot(stripHtml(line["סוג"]), 'אוטובוס'),
       "שעת התייצבות": stripHtml(line["זמני עצירה"].split('\n')[0]),
       "שם קו": stripHtml(line["שם קו"]),
-      "תחנות": stripHtml(line["תחנות"].split('\n').join(', ')),
+      "תחנות": stripHtml(line["מיקומי תחנות"]),
       "מוביל": stripHtml(line["מוביל"])
     });
   }
@@ -132,6 +132,106 @@ function whatsappLink(phone, text) {
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
+function getLineStops(line) {
+  var as = parse(line["תחנות"]).getElementsByTagName('a');
+  var stops = [];
+  for (var j = 0; j < as.length; j++) {
+    var stopEl = as[j];
+    stops.push({
+      name: stopEl.innerText,
+      line: line["שם קו"],
+      lineNumber: line["מספר אוטובוס"],
+      token: stopEl.href.split('t=')[1].split('"')[0],
+      busToken: line["קישור ניהול"].split('t=')[1].split('"')[0]
+    });
+  }
+  return stops;
+}
+
+function getStopsDetails(url, line) {
+  var busToken = getBusToken(line);
+  if (!busToken || busToken === '') return Promise.resolve([]);
+  var stopsDetails = [];
+  var origin = url.split("/").slice(0, 3).join("/");
+  let cached = cache(busToken);
+  if (cached) return Promise.resolve({line, stops: cached});
+  return fetch(origin + "/controller/modals/AJAX_busLocationsModal.php", {
+    method: "POST",
+    body: new URLSearchParams({ busToken })
+  })
+  .then(function (response) {
+    return response.text().then(function (html) {
+      try {
+        var doc = parse(html);
+        var stops = doc.getElementsByClassName('card-header');
+
+        for (var i = 0; i < stops.length; i++) {
+          var stop = stops[i];
+          var parent = stop.firstElementChild;
+          var city = parent.firstElementChild.innerText.trim();
+          var stopName = parent.lastElementChild.innerText.trim();
+          
+          if (stopName.endsWith('.') || stopName.endsWith(',')) stopName = stopName.substring(0, stopName.length - 1);
+
+          if (stopName.indexOf(city) === -1) {
+            stopName = stopName + ', ' + city;
+          }
+
+          stopsDetails.push(stopName);
+        }
+
+        cache(busToken, stopsDetails);
+        return { line, stops: stopsDetails };
+      }
+      catch (e) {
+        console.error("Error parsing HTML:", e);
+        log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
+        alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
+      }
+    }).catch(function(error) {
+      console.error("Error making POST request:", error);
+      log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
+      log('יותר מדי בקשות. ממתין 30 שניות ומנסה להמשיך...');
+      return new Promise(function (resolve, reject) {
+        setTimeout(function () {
+          resolve(getStopsDetails(url, line));
+        }, 30000);
+      });
+    });;
+  });
+}
+
+function getBusToken(line) {
+  var num = line["מספר"];
+  if (num) {
+    return num.split('data-token="')[1].split('"')[0];
+  }
+  return '';
+}
+
+function addStopDetails(url, lines) {
+  var calls = [];
+  for (var i = 0; i < lines.length; i++) {
+    calls.push(getStopsDetails(url, lines[i]).then(function ({ line, stops }) {
+      line["מיקומי תחנות"] = stops.join(" >> ");
+      line["שעת התייצבות"] = stripHtml(line["זמני עצירה"].split('\n')[0])
+    }));
+  }
+  return Promise.all(calls).then(function () {
+    return lines;
+  });
+}
+
+function getStops(lines) {
+  var stops = [];
+  for (var i = 0; i < lines.length; i++) {
+    var lineStops = getLineStops(lines[i]);
+    stops = stops.concat(lineStops);
+  }
+  log('נמצאו ' + stops.length + ' תחנות');
+  return stops;
+}
+
 function getLines(url) {
   //let cached = cache(url);
   //if (cached) return Promise.resolve(cached);
@@ -151,6 +251,7 @@ function getLines(url) {
 
         for (var i = 0; i < busElements.length; i++) {
           var busElement = busElements[i];
+          var busToken  = busElement.getAttribute('id');
           var busNumber = busElement.getElementsByClassName('plate')[0].innerText;
           var passengers = findMatchByAction(busElement, 'button', 'openBusJoiner', 'נוסעים');
           var line = findMatchByAction(busElement, 'div', 'fas fa-bus-alt', 'קו');
@@ -182,11 +283,12 @@ function getLines(url) {
           var seats = findMatchByAction(busElement, 'div', 'מקס׳ מקומות:', 'מקס׳ מקומות:').split('|')[0].trim();
           
           lines.push({
-            "מספר": '<div style="font-size: 22pt;">' + busNumber + '</div>',
-            "רשומים": passengers < 10 ? '<div style="background-color: #ff000070; font-size: 20pt;">' + passengers + '</div>' : (
+            "מספר": '<div style="font-size: 22pt;" data-token="' + busToken + '">' + busNumber + '</div>',
+            "רשומים": passengers <= 1 ? '<div style="background-color: #fff3f3f3; font-size: 20pt;">' + passengers + '</div>' : (
+              passengers < 10 ? '<div style="background-color: #ff000070; font-size: 20pt;">' + passengers + '</div>' : (
               passengers < 20 ? '<div style="background-color: #ffa50070; font-size: 20pt;">' + passengers + '</div>' : (
                 passengers < 25 ? '<div style="background-color: #ffff0070; font-size: 20pt;">' + passengers + '</div>' : 
-                  '<div style="background-color: #00ff0070; font-size: 20pt;">' + passengers + '</div>'
+                  '<div style="background-color: #00ff0070; font-size: 20pt;">' + passengers + '</div>')
               )
             ),
             "סוג": seats < 2 ? '' : (seats > 20 ? 
@@ -225,7 +327,7 @@ function getLines(url) {
         log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
         alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
       }
-    });
+    }).then(lines => addStopDetails(url, lines));
   })
   .catch(function(error) {
     console.error("Error making POST request:", error);
@@ -396,27 +498,6 @@ var getPassengers = function (url, stops) {
     log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
     alert('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
   });
-}
-
-function getStops(lines) {
-  var stops = [];
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-
-    var as = parse(line["תחנות"]).getElementsByTagName('a');
-    for (var j = 0; j < as.length; j++) {
-      var stopEl = as[j];
-      stops.push({
-        name: stopEl.innerText,
-        line: line["שם קו"],
-        lineNumber: line["מספר אוטובוס"],
-        token: stopEl.href.split('t=')[1].split('"')[0],
-        busToken: line["קישור ניהול"].split('t=')[1].split('"')[0]
-      });
-    }
-  }
-  log('נמצאו ' + stops.length + ' תחנות');
-  return stops;
 }
 
 function fixDonors(donors) {
