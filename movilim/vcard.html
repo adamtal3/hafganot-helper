@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ניהול קו - קובץ אנשי קשר</title>
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <div id="wrap">
+      <main>
+        <form id="form" class="form">
+          <header>
+            <h1>ניהול קו - קובץ אנשי קשר</h1>
+          </header>
+          <label>הזן קישור ניהול לקו:</label>
+          <input type="text" id="link" required /><br>
+          <label>שם או מספר קו שיופיע בתחילת שם האיש קשר:</label>
+          <input type="lineNum" id="lineNum" required />
+          <button type="submit">הורדה</button><br/>
+          <a class="to-index" href="./index.html">לדפים להדפסה</a>
+        </form>
+      </main>
+    </div>
+    <script>
+      document.getElementById('form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var url = document.getElementById('link').value.split('#')[0];
+        var lineNum = document.getElementById('lineNum').value;
+        localStorage.setItem("link", url);
+        localStorage.setItem("lineNum", lineNum);
+        var csvUrl = url.replace('eventBus', 'busDataReports/BUS_busReportLocation.php');
+
+        fetch(csvUrl)
+        .then(function (response) { return response.arrayBuffer(); })
+        .then(function (buffer) { return new TextDecoder("utf-16le").decode(buffer); })
+        .then(function (text) {
+          var csv = text.split('\n').map(function (line) {
+            return line.split('\t');
+          });
+          
+          var headers = true;
+          var contacts = csv.map(function (line) {
+            if (headers) {
+              headers = false;
+              return null;
+            }
+            return {
+              name: 'קו ' + lineNum + ' - ' + line[3] + ' ' + line[4],
+              phone: line[5],
+              email: line[6],
+            };
+          }).filter(x => x && x.phone);
+
+          var vcard = contacts.map(function (contact) {
+            return 'BEGIN:VCARD\nVERSION:3.0\nFN:' + contact.name + '\nTEL;TYPE=CELL:' + contact.phone + '\nEMAIL;TYPE=INTERNET:' + contact.email + '\nEND:VCARD';
+          }).join('\n\n');
+
+          var blob = new Blob([vcard], { type: 'text/vcard' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url
+          a.download = lineNum + '.vcf';
+          a.click();
+        });
+
+        return false;
+      });
+      document.getElementById("link").value = localStorage.getItem("link");
+      document.getElementById("lineNum").value = localStorage.getItem("lineNum");
+    </script>
+  </body>
+</html>
