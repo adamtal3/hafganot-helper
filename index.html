@@ -17,6 +17,7 @@
           <input type="text" id="link" required />
           <button type="submit">קבל מידע</button><br/>
           <button type="button" id="order-table">טבלת הזמנת אוטובוסים</button>
+          <button type="button" id="movilim">קובץ אנשי קשר למובילים</button>
           <button type="button" class="clear-cache" onclick="sessionStorage.clear();">ניקוי מטמון</button>
           <a class="to-payers" href="./payers.html">לעדכון משלמשים אוטומטי</a>
           <section class="log">
@@ -58,6 +59,39 @@
 
         return false;
       });
+      
+      document.getElementById('movilim').addEventListener('click', function(event) {
+        event.preventDefault();
+        var url = document.getElementById('link').value.split('#')[0];
+        cache('link', url);
+
+        getLines(url).then(function (lines) {
+          var contacts = lines.map(function (line) {
+            var value = line['מוביל'].replace(/>/, '<').split('<')
+            var name = value[0].trim();
+            var phone = value[value.length - 2].trim();
+            var lineNum = stripHtml(line['מספר']);
+            return {
+              name: 'ניהול קו ' + lineNum + ' - ' + name,
+              phone: phone
+            };
+          }).filter(x => x && x.phone);
+
+          var vcard = contacts.map(function (contact) {
+            return 'BEGIN:VCARD\nVERSION:3.0\nFN:' + contact.name + '\nTEL;TYPE=CELL:' + contact.phone + '\nEMAIL;TYPE=INTERNET:' + contact.email + '\nEND:VCARD';
+          }).join('\n\n');
+
+          var blob = new Blob([vcard], { type: 'text/vcard' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url
+          a.download = 'movilim.vcf';
+          a.click();
+        });
+
+        return false;
+      });
+      
       var cachedLink = cache('link');
       if (cachedLink) {
         document.getElementById('link').value = cachedLink;

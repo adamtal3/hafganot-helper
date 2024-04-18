@@ -140,7 +140,7 @@ function getLineStops(line) {
     stops.push({
       name: stopEl.innerText,
       line: line["שם קו"],
-      lineNumber: line["מספר אוטובוס"],
+      lineNumber: line["מספר"],
       token: stopEl.href.split('t=')[1].split('"')[0],
       busToken: line["קישור ניהול"].split('t=')[1].split('"')[0]
     });
@@ -314,7 +314,7 @@ function getLines(url) {
         }
 
         lines.sort(function (a, b) {
-          return busNum(a["מספר אוטובוס"]) - busNum(b["מספר אוטובוס"]);
+          return busNum(a["מספר"]) - busNum(b["מספר"]);
         });
 
         log('נמצאו ' + lines.length + ' קווים');
@@ -483,7 +483,7 @@ var getPassengers = function (url, stops) {
         return s.token === passenger.stopToken;
       });
       if (stop) {
-        passenger["מספר אוטובוס"] = stop.lineNumber;
+        passenger["מספר"] = stop.lineNumber;
         passenger["שם קו"] = stop.line;
         passenger["תחנה"] = stop.name;
         passenger.busToken = stop.busToken;
