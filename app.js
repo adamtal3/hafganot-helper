@@ -213,7 +213,10 @@ function addStopDetails(url, lines) {
   var calls = [];
   for (var i = 0; i < lines.length; i++) {
     calls.push(getStopsDetails(url, lines[i]).then(function ({ line, stops }) {
-      line["מיקומי תחנות"] = stops.join(" >> ");
+      var index = 1;
+      line["מיקומי תחנות"] = stops.map(function (stop) {
+        return (index++) + '. ' + stop;
+      }).join('\r\n<br/>');
       line["שעת התייצבות"] = stripHtml(line["זמני עצירה"].split('\n')[0])
     }));
   }
