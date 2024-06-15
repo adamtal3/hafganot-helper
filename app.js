@@ -433,7 +433,10 @@ function addTokens(url, passengers) {
           var row = rows[j];
           var match = passengers.find(function (p) { return p.stopToken === stopToken && row.innerHTML.indexOf(p.phone) > 0 && row.innerHTML.indexOf(p.name) >= 0; });
           if (match) {
-            match.token = findMatchByAction(row, 'td', 'openBusJoinerModal', '', true).getAttribute('onclick').split("'")[1];
+            let el = findMatchByAction(row, 'td', 'openBusJoinerModal', '', true);
+            match.deleted = el.innerHTML.indexOf('line-through') > -1;
+            match.waiting = row.innerHTML.indexOf('fa-pause-circle') > -1;
+            match.token = el.getAttribute('onclick').split("'")[1];
             let payAmountEl = findMatchByAction(row, 'td', 'fad fa-coin', '', true);
             match.paid = payAmountEl ? payAmountEl.innerText.trim() : '0';
           }
@@ -572,6 +575,14 @@ function checkPaid(url, donors, passengers) {
         if (match.paid > 0) {
           donor.Status = "כבר סומן";
           log('כבר סומן עבור: ' + donor.Name);
+        }
+        else if (match.deleted) {
+          donor.Status = "נמחק";
+          log('נמחק ולא סומן עבור: ' + donor.Name);
+        }
+        else if (match.waiting) {
+          donor.Status = "ממתין";
+          log('ממתין ולא סומן עבור: ' + donor.Name);
         }
         else {
           donor.Status = "נמצא";
