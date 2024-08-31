@@ -506,7 +506,34 @@ var getPassengers = function (url, stops) {
   });
 }
 
+function readFile(file) {
+  return new Promise(function (resolve, reject) {
+    if (file) {
+      var reader = new FileReader();
+      reader.readAsText(file, "UTF-8");
+      reader.onload = function (evt) {
+        resolve(evt.target.result);
+      };
+      reader.onerror = function (evt) {
+        log('אירעה שגיאה בעת עיבוד המידע: ' + evt.target.error);
+        reject(evt.target.error);
+      };
+    }
+    else {
+      log('לא נבחר קובץ');
+      reject('לא נבחר קובץ');
+    }
+  });
+}
+
 function fixDonors(donors) {
+  if (donors.length === 0) return donors;
+  else if (donors[0]["Target Name"]) {
+    donors = donors.filter(function (donor) {
+      return donor && donor["Target Name"] && donor["Target Name"].indexOf('הסעות') >= 0;
+    });
+  }
+
   return donors.map(function (donor) {
     delete donor["Target Name"];
     delete donor["Target id"];
@@ -518,7 +545,7 @@ function fixDonors(donors) {
     if (donor.Phone.startsWith('+972')) {
       donor.Phone = donor.Phone.replace('+972', '0');
     }
-    else {
+    else if (!donor.Phone.startsWith('05')) {
       donor.Phone = '0' + donor.Phone;
     }
     donor.Phone = donor.Phone.replace(/(\d{3})(\d{7})/, '$1-$2');
@@ -556,7 +583,7 @@ function checkPaid(url, donors, passengers) {
     log('סנכרון תשלום עבור: ' + (i + 1) + ' מתוך ' + donors.length + ' - ' + donor.Name + ' - ' + donor.Amount + '₪');
     var quantity = parseInt(Math.round(donor.Amount / 30));
     var matches = passengers.filter(function (p) {
-      return p.phone === donor.Phone;
+      return p.phone === donor.Phone || (p.email && p.email === donor.Email);
     });
     if (matches.length === 0) {
       log('לא נמצא נוסע עבור: ' + donor.Phone + ' מחפש לפי שם: ' + donor.Name);

@@ -28,6 +28,8 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/jszip.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/xlsx.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.40/jquery.csv.min.js"></script>
     <script src="./app.js"></script>
     <script>
       document.getElementById('form').addEventListener('submit', function(event) {
@@ -37,8 +39,7 @@
         var url = document.getElementById('link').value.split('#')[0];
         cache('link', url);
 
-        parseExcel(file).then(function (sheets) {
-          var donors = sheets[0];
+        function handleDonors(donors) {
           donors = fixDonors(donors);
 
           getLines(url).then(function (lines) {
@@ -56,7 +57,23 @@
               });
             });
           });
-        });
+        }
+
+        if (file.name.toLowerCase().endsWith('.xlsx')) {
+          parseExcel(file).then(function (sheets) {
+            var donors = sheets[0];
+            handleDonors(donors);
+          });
+        }
+        else if (file.name.toLowerCase().endsWith('.csv')) {
+          readFile(file).then(function (text) {
+            var donors = $.csv.toObjects(text);
+            handleDonors(donors);
+          });
+        }
+        else {
+          return alert('נא להעלות קובץ אקסל');
+        }
 
         return false;
       });
