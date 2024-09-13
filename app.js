@@ -560,10 +560,9 @@ function fixDonors(donors) {
 
 function markPaid(url, joinerToken, amount) {
   var origin = url.split("/").slice(0, 3).join("/");
-  var amount = 30;
   return fetch(origin + "/controller/AJAX_joinerMarkPay.php", {
     method: "POST",
-    body: new URLSearchParams({ joinerToken, amount: 30, payTypeID: 4, payVaucher: "JGive (" + amount + "₪)" }),
+    body: new URLSearchParams({ joinerToken, amount, payTypeID: 4, payVaucher: "JGive (" + amount + "₪)" }),
   }).catch(function(error) {
     console.error("Error making POST request:", error);
     log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
@@ -599,7 +598,8 @@ function checkPaid(url, donors, passengers) {
       }
 
       matches.forEach(function (match) {
-        if (match.paid > 0) {
+        var pamount = matches.length === quantity ? 30 : matches.indexOf(match) === 0 ? donor.Amount - (matches.length - 1) * 30 : 30;
+        if (match.paid >= pamount) {
           donor.Status = "כבר סומן";
           log('כבר סומן עבור: ' + donor.Name);
         }
@@ -615,8 +615,8 @@ function checkPaid(url, donors, passengers) {
           donor.Status = "נמצא";
           log('נמצא ומסמן תשלום עבור: ' + donor.Name);
           calls.push(function() {
-            match.paid = 30;
-            return markPaid(url, match.token, donor.Amount);
+            match.paid = pamount;
+            return markPaid(url, match.token, pamount);
           });
         }
       });
