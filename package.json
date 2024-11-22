@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "axios": "^1.7.7",
+    "axios-cookiejar-support": "^5.0.3",
+    "jquery": "^3.7.1",
+    "jquery-csv": "^1.0.40",
+    "jsdom": "^25.0.1",
+    "tough-cookie": "^5.0.0"
+  }
+}

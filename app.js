@@ -34,8 +34,13 @@ function toTable(data) {
 }
 
 function stripHtml(html) {
-  var doc = new DOMParser().parseFromString(html, 'text/html');
-  return doc.body.textContent || "";
+  if (typeof DOMParser !== "undefined") {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
+  }
+  else {
+    return html.replace(/<\/?[^>]+(>|$)/g, ""); // Removes tags
+  }
 }
 
 function boldIfNot(text, not) {
@@ -61,9 +66,9 @@ function toOrder(data) {
 }
 
 function log(data) {
-  var el = document.createElement('div');
-  el.innerHTML = data;
-  var log = document.getElementById('log');
+  var el = typeof document !== 'undefined' ? document.createElement('div') : null;
+  if (el) el.innerHTML = data;
+  var log = typeof document !== 'undefined' ? document.getElementById('log') : null;
   if (log) {
     log.appendChild(el);
     log.scrollIntoView(false);
@@ -73,6 +78,7 @@ function log(data) {
   }
 }
 function progress(current, total) {
+  if (typeof document === 'undefined') return;
   var progress = document.getElementById('progress');
   if (progress) {
     progress.style.width = parseInt(current / total * 100) + '%';
@@ -87,6 +93,7 @@ function progress(current, total) {
 }
 
 function cache(key, value) {
+  if (typeof sessionStorage === 'undefined') return null;
   if (value) {
     sessionStorage.setItem(key, JSON.stringify(value));
   }
@@ -99,7 +106,7 @@ function cache(key, value) {
 function findMatchByAction(parent, selector, action, remove, getElement) {
   var elements = parent.getElementsByTagName(selector);
   for (var el of elements) {
-    if (el.outerHTML.indexOf(action) > 0 && (!remove || el.innerText.indexOf(remove) > 0)) {
+    if (el.outerHTML.indexOf(action) > 0 && (!remove || (el.innerText || el.textContent).indexOf(remove) > 0)) {
       var innerMatch = findMatchByAction(el, selector, action, remove, getElement);
       if (innerMatch) {
         return innerMatch;
@@ -109,7 +116,7 @@ function findMatchByAction(parent, selector, action, remove, getElement) {
         return el;
       }
 
-      var result = el.innerText;
+      var result = el.innerText || el.textContent;
       if (remove) {
         result = result.replace(remove, '');
       }
@@ -120,8 +127,15 @@ function findMatchByAction(parent, selector, action, remove, getElement) {
 }
 
 function parse(html) {
-  var parser = new DOMParser();
-  return parser.parseFromString(html, "text/html");
+  if (typeof DOMParser !== "undefined") {
+    var parser = new DOMParser();
+    return parser.parseFromString(html, "text/html");
+  }
+  else {
+    var JSDOM = require('jsdom').JSDOM;
+    html = `<!DOCTYPE html><body>${html}</body></html>`;
+    return new JSDOM(html).window.document;
+  }
 }
 
 function whatsappLink(phone, text) {
@@ -168,8 +182,8 @@ function getStopsDetails(url, line) {
         for (var i = 0; i < stops.length; i++) {
           var stop = stops[i];
           var parent = stop.firstElementChild;
-          var city = parent.firstElementChild.innerText.trim();
-          var stopName = parent.lastElementChild.innerText.trim();
+          var city = (parent.firstElementChild.innerText || parent.firstElementChild.textContent).trim();
+          var stopName = (parent.lastElementChild.innerText || parent.lastElementChild.textContent).trim();
           
           if (stopName.endsWith('.') || stopName.endsWith(',')) stopName = stopName.substring(0, stopName.length - 1);
 
@@ -255,7 +269,7 @@ function getLines(url) {
         for (var i = 0; i < busElements.length; i++) {
           var busElement = busElements[i];
           var busToken  = busElement.getAttribute('id');
-          var busNumber = busElement.getElementsByClassName('plate')[0].innerText;
+          var busNumber = (busElement.getElementsByClassName('plate')[0].innerText || busElement.getElementsByClassName('plate')[0].textContent).trim();
           var passengers = findMatchByAction(busElement, 'button', 'openBusJoiner', 'נוסעים');
           var line = findMatchByAction(busElement, 'div', 'fas fa-bus-alt', 'קו');
           var lockedLine = findMatchByAction(busElement, 'div', 'fas fa-lock', 'קו');
@@ -264,7 +278,7 @@ function getLines(url) {
           for (var a of busElement.getElementsByTagName('a')) {
             if (a.href.indexOf("/eventBus?t=") > 0) {
               var span = a.getElementsByTagName('span')[0];
-              stopsTimes.push(span.firstChild.innerText.trim());
+              stopsTimes.push((span.firstChild.innerText || span.firstChild.textContent).trim());
               stops.push(
                 '<a href="' + a.href + '" target="_blank">' + span.lastChild.textContent.trim() + '</a>'
               );
@@ -385,7 +399,7 @@ function getAllPassengers(referrer, eventBusesAdminToken) {
         for (var i = 0; i < cards.length; i++) {
           var card = cards[i];
 
-          var name = card.getElementsByClassName('card-header')[0].getElementsByTagName('h4')[0].innerText;
+          var name = card.getElementsByClassName('card-header')[0].getElementsByTagName('h4')[0].innerText || card.getElementsByClassName('card-header')[0].getElementsByTagName('h4')[0].textContent;
           var phone = findMatchByAction(card, 'a', 'tel:', null, false, card);
           var email = findMatchByAction(card, 'a', 'mailto:', null, false, card);
           var stopTokenEl = findMatchByAction(card, 'a', 'eventBus?t=', null, true, card);
@@ -438,7 +452,7 @@ function addTokens(url, passengers) {
             match.waiting = row.innerHTML.indexOf('fa-pause-circle') > -1;
             match.token = el.getAttribute('onclick').split("'")[1];
             let payAmountEl = findMatchByAction(row, 'td', 'fad fa-coin', '', true);
-            match.paid = payAmountEl ? payAmountEl.innerText.trim() : '0';
+            match.paid = payAmountEl ? (payAmountEl.innerText || payAmountEl.textContent).trim() : '0';
           }
         }
       }
@@ -580,7 +594,7 @@ function checkPaid(url, donors, passengers) {
   for (var i = 0; i < donors.length; i++) {
     var donor = donors[i];
     log('סנכרון תשלום עבור: ' + (i + 1) + ' מתוך ' + donors.length + ' - ' + donor.Name + ' - ' + donor.Amount + '₪');
-    var quantity = parseInt(Math.round(donor.Amount / 30));
+    var quantity = parseInt(Math.round(donor.Amount / 40));
     var matches = passengers.filter(function (p) {
       return p.phone === donor.Phone || (p.email && p.email === donor.Email);
     });
@@ -598,7 +612,7 @@ function checkPaid(url, donors, passengers) {
       }
 
       matches.forEach(function (match) {
-        var pamount = matches.length === quantity ? 30 : matches.indexOf(match) === 0 ? donor.Amount - (matches.length - 1) * 30 : 30;
+        var pamount = matches.length === quantity ? 40 : matches.indexOf(match) === 0 ? donor.Amount - (matches.length - 1) * 40 : 40;
         if (match.paid >= pamount) {
           donor.Status = "כבר סומן";
           log('כבר סומן עבור: ' + donor.Name);
@@ -647,7 +661,7 @@ function checkPaid(url, donors, passengers) {
     if (calls.length) {
       log('הסתיים. בוצעו ' + calls.length + ' קריאות');
       var link = cache('link');
-      sessionStorage.clear();
+      if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
       cache('link', link);
     }
     else {
@@ -655,4 +669,34 @@ function checkPaid(url, donors, passengers) {
     }
     return donors;
   });
+}
+
+if (module) {
+  module.exports = {
+    toH1,
+    toTable,
+    stripHtml,
+    boldIfNot,
+    toOrder,
+    log,
+    progress,
+    cache,
+    findMatchByAction,
+    parse,
+    whatsappLink,
+    getLineStops,
+    getStopsDetails,
+    getBusToken,
+    addStopDetails,
+    getStops,
+    getLines,
+    parseExcel,
+    getAllPassengers,
+    addTokens,
+    getPassengers,
+    readFile,
+    fixDonors,
+    markPaid,
+    checkPaid
+  };
 }
