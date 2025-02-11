@@ -42,8 +42,20 @@ function markPayers(text, url) {
   });
 }
 
-async function processExport(password, url) {
+async function processExport(password, url, targetId, rerun) {
   try {
+    if (rerun) {
+      // Don't run between 22:00 and 08:00
+      const now = new Date();
+      const hours = now.getHours();
+      if (hours >= 22 || hours < 8) {
+        log(`Skipping. It's between 22:00 and 08:00 - waiting for 1 hour before running again`);
+        setTimeout(function () {
+          processExport(password, url, targetId, true);
+        }, 3600000);
+        return;
+      }
+    }
     // Step 1: Authentication to get x-csrf-token
     log('Authenticating...');
     const authResponse = await client.post('https://www.jgive.com/graphql', 
@@ -66,7 +78,7 @@ async function processExport(password, url) {
           downloadType: 'unified_export',
           financialFilter: null,
           filter: {
-            donationTargetId: '122602',
+            donationTargetId: `${targetId}`,
             paymentMethodFilter: {},
           },
           charityOrganizationId: '4352',
@@ -157,7 +169,14 @@ async function processExport(password, url) {
         // Run again in 1 hour
         log(`Done processing ${donors.length} donors - waiting for 1 hour before running again`);
         lastRun = new Date();
-        setTimeout(() => processExport(password, url), 3600000);
+        setTimeout(function () {
+          processExport(password, url, targetId, true);
+        }, 3600000);
+      }).catch(function (error) {
+        log(`Error: ${error.message}. Trying again in 30 minutes`);
+        setTimeout(function () {
+          processExport(password, url, targetId, true);
+        }, 1800000);
       });
     } else {
       throw new Error('File URL not found');
@@ -173,7 +192,16 @@ async function processExport(password, url) {
   // Get password from argument
   const password = process.argv[2];
   const url = process.argv[3]; // Call with node index.js <encoded_password> <buses_url>
+  const targetId = process.argv[4] || 122602; // Call with node index.js <encoded_password> <buses_url> 122193
   if (!password)
     throw new Error('Password is required as an argument');
-  await processExport(atob(password), url);
+  if (process.argv[5]) {
+    var days = parseInt(process.argv[5]);
+    if (days > 0) {
+      var today = new Date();
+      lastRun = new Date();
+      lastRun.setDate(today.getDate() - days); // Calculate X days ago
+    }
+  }
+  await processExport(atob(password), url, targetId);
 })();

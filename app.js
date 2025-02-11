@@ -1,3 +1,4 @@
+var COST = 50;
 
 function toH1(text) {
   var h1 = document.createElement('h1');
@@ -78,17 +79,28 @@ function log(data) {
   }
 }
 function progress(current, total) {
-  if (typeof document === 'undefined') return;
-  var progress = document.getElementById('progress');
-  if (progress) {
-    progress.style.width = parseInt(current / total * 100) + '%';
-    progress.style.backgroundColor = 'lightgreen';
-    progress.style.alignSelf = 'flex-start';
-    progress.style.padding = '2px';
-    progress.style.borderRadius = '10px';
-    progress.style.textAlign = 'center';
-    progress.style.fontWeight = 'bold';
-    progress.innerText = parseInt(current / total * 100) + '%';
+  if (typeof document === 'undefined') {
+    try {
+      process.stdout.clearLine();
+      process.stdout.cursorTo(0);
+      process.stdout.write(`Progress: ${parseInt(current / total * 100)}%`);
+    }
+    catch {
+      console.log(`Progress: ${parseInt(current / total * 100)}%`);
+    }
+  }
+  else {
+    var progress = document.getElementById('progress');
+    if (progress) {
+      progress.style.width = parseInt(current / total * 100) + '%';
+      progress.style.backgroundColor = 'lightgreen';
+      progress.style.alignSelf = 'flex-start';
+      progress.style.padding = '2px';
+      progress.style.borderRadius = '10px';
+      progress.style.textAlign = 'center';
+      progress.style.fontWeight = 'bold';
+      progress.innerText = parseInt(current / total * 100) + '%';
+    }
   }
 }
 
@@ -200,7 +212,6 @@ function getStopsDetails(url, line) {
       catch (e) {
         console.error("Error parsing HTML:", e);
         log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
-        alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
       }
     }).catch(function(error) {
       console.error("Error making POST request:", error);
@@ -342,14 +353,12 @@ function getLines(url) {
       catch (e) {
         console.error("Error parsing HTML:", e);
         log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
-        alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
       }
     }).then(lines => addStopDetails(url, lines));
   })
   .catch(function(error) {
     console.error("Error making POST request:", error);
-    log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
-    alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
+    log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
   });
 }
 
@@ -414,14 +423,12 @@ function getAllPassengers(referrer, eventBusesAdminToken) {
       catch (e) {
         console.error("Error parsing HTML:", e);
         log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
-        alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
       }
     });
   })
   .catch(function(error) {
     console.error("Error making POST request:", error);
     log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
-    alert('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
   });
 }
 
@@ -515,8 +522,7 @@ var getPassengers = function (url, stops) {
   })
   .catch(function(error) {
     console.error("Error making POST request:", error);
-    log('אירעה שגיאה בעת עיבוד המידע: ' + e.message);
-    alert('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
+    log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
   });
 }
 
@@ -594,7 +600,7 @@ function checkPaid(url, donors, passengers) {
   for (var i = 0; i < donors.length; i++) {
     var donor = donors[i];
     log('סנכרון תשלום עבור: ' + (i + 1) + ' מתוך ' + donors.length + ' - ' + donor.Name + ' - ' + donor.Amount + '₪');
-    var quantity = parseInt(Math.round(donor.Amount / 40));
+    var quantity = parseInt(Math.round(donor.Amount / COST));
     var matches = passengers.filter(function (p) {
       return p.phone === donor.Phone || (p.email && p.email === donor.Email);
     });
@@ -612,7 +618,7 @@ function checkPaid(url, donors, passengers) {
       }
 
       matches.forEach(function (match) {
-        var pamount = matches.length === quantity ? 40 : matches.indexOf(match) === 0 ? donor.Amount - (matches.length - 1) * 40 : 40;
+        var pamount = matches.length === quantity ? COST : matches.indexOf(match) === 0 ? donor.Amount - (matches.length - 1) * COST : COST;
         if (match.paid >= pamount) {
           donor.Status = "כבר סומן";
           log('כבר סומן עבור: ' + donor.Name);
