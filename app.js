@@ -578,6 +578,23 @@ function fixDonors(donors) {
   });
 }
 
+function moveFromWaiting(origin, joinerToken) {
+  return fetch(origin + "/controller/BUS_noStandbyBusJoiner.php", {
+    method: "POST",
+    body: new URLSearchParams({ joinerToken }),
+    referrer: origin
+  }).catch(function(error) {
+    console.error("Error making POST request:", error);
+    log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
+    log('יותר מדי בקשות. ממתין 30 שניות ומנסה להמשיך...');
+    return new Promise(function (resolve, reject) {
+      setTimeout(function () {
+        resolve(moveFromWaiting(origin, joinerToken));
+      }, 30000);
+    });
+  });
+}
+
 function markPaid(url, joinerToken, amount) {
   var origin = url.split("/").slice(0, 3).join("/");
   return fetch(origin + "/controller/AJAX_joinerMarkPay.php", {
@@ -605,6 +622,7 @@ function checkPaid(url, donors, passengers) {
       return p.phone === donor.Phone || (p.email && p.email === donor.Email);
     });
     if (matches.length === 0) {
+
       log('לא נמצא נוסע עבור: ' + donor.Phone + ' מחפש לפי שם: ' + donor.Name);
       matches = passengers.filter(function (p) {
         return p.name === donor.Name;
@@ -677,7 +695,7 @@ function checkPaid(url, donors, passengers) {
   });
 }
 
-if (module) {
+if (typeof module !== 'undefined') {
   module.exports = {
     toH1,
     toTable,
@@ -703,6 +721,7 @@ if (module) {
     readFile,
     fixDonors,
     markPaid,
-    checkPaid
+    checkPaid,
+    moveFromWaiting
   };
 }

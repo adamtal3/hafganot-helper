@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ניהול קו - הכנסת ממתינים</title>
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <div id="wrap">
+      <main>
+        <form id="form" class="form">
+          <header>
+            <h1>ניהול קו - הכנסת ממתינים</h1>
+          </header>
+          <label>הזן קישור ניהול לקו:</label>
+          <input type="text" id="link" required /><br>
+          <button type="submit">הכנסה אוטומטית של כל הממתינים</button><br/>
+          <a class="to-index" href="./index.html">לדפים להדפסה</a>
+          <a class="to-index" href="./vcard.html">ליצירת קובץ אנשי קשר</a>
+          <section class="log">
+            <div id="log"><br/></div>
+          </section>
+          <div id="progress"><br/></div>
+        </form>
+      </main>
+    </div>
+    <script src="../app.js"></script>
+    <script>
+      document.getElementById('form').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        var url = document.getElementById('link').value.split('#')[0];
+        var origin = url.split("/").slice(0, 3).join("/");
+        localStorage.setItem("link", url);
+
+        let totalMoved = 0;
+
+        function stopCallback(html) {
+          var doc = parse(html);
+          var passengers = doc.getElementsByTagName('tr');
+          var runNext = function (i) {
+            var row = passengers[i];
+            var iWaiting = row.innerHTML.indexOf('fa-pause-circle') > -1;
+
+            if (iWaiting) {
+              let el = findMatchByAction(row, 'td', 'openBusJoinerModal', '', true);
+              var token = el.getAttribute('onclick').split("'")[1];
+              totalMoved++;
+              return moveFromWaiting(origin, token).then(function () {
+                if (i + 1 < passengers.length) {
+                  return runNext(i + 1);
+                }
+                else {
+                  return Promise.resolve();
+                }
+              });
+            }
+            else {
+              if (i + 1 < passengers.length) {
+                return runNext(i + 1);
+              }
+              else {
+                return Promise.resolve();
+              }
+            }
+          }
+          return runNext(0);
+        }
+
+        function callback(html, fromCache) {
+          var doc = parse(html);
+          var buttons = doc.getElementsByTagName('a');
+          var stops = [];
+          for (var i = 0; i < buttons.length; i++) {
+            var button = buttons[i];
+            if (button.getAttribute('href') && button.getAttribute('href').indexOf('eventBus?t') >= 0) {
+              var href = button.getAttribute('href');
+              stops.push(href.split('t=')[1].split('&')[0]);
+            }
+          }
+
+          var runNext = function (i) {
+            log('Processing stop ' + (i + 1) + ' of ' + stops.length);
+            progress(i+1, stops.length);
+            var stopToken = stops[i];
+            fetch(origin + "/controller/BUS_locationJoinersData.php", {
+              method: "POST",
+              body: new URLSearchParams({ locationToken: stopToken }),
+              referrer: url
+            }).then(function (response) {
+              return response.text().then(function (html) {
+                return stopCallback(html).then(function () {
+                  if (i + 1 < stops.length) {
+                    return runNext(i + 1);
+                  }
+                  else {
+                    progress(stops.length, stops.length);
+                    log('Done. Moved ' + totalMoved + ' passengers from waiting.');
+                    alert('Done');
+                  }
+                });
+              });
+            });
+          }
+          return runNext(0);
+        }
+        
+        var stopToken = url.split('t=')[1].split('&')[0];
+        fetch(origin + "/controller/BUS_locationData.php", {
+          referrer: url,
+          method: "POST",
+          body: new URLSearchParams({ locationToken: stopToken })
+        }).then(function (response) {
+          return response.text().then(function (html) {
+            return callback(html);
+          });
+        });
+      });
+
+      document.getElementById("link").value = localStorage.getItem("link");
+    </script>
+  </body>
+</html>
