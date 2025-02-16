@@ -116,6 +116,7 @@ function cache(key, value) {
 }
 
 function findMatchByAction(parent, selector, action, remove, getElement) {
+  if (!parent) return '';
   var elements = parent.getElementsByTagName(selector);
   for (var el of elements) {
     if (el.outerHTML.indexOf(action) > 0 && (!remove || (el.innerText || el.textContent).indexOf(remove) > 0)) {
@@ -595,6 +596,23 @@ function moveFromWaiting(origin, joinerToken) {
   });
 }
 
+function clearPayment(origin, joinerToken) {
+  return fetch(origin + "/controller/AJAX_joinerCancelPay.php", {
+    method: "POST",
+    body: new URLSearchParams({ joinerToken }),
+    referrer: origin
+  }).catch(function(error) {
+    console.error("Error making POST request:", error);
+    log('אירעה שגיאה בעת עיבוד המידע: ' + error.message);
+    log('יותר מדי בקשות. ממתין 30 שניות ומנסה להמשיך...');
+    return new Promise(function (resolve, reject) {
+      setTimeout(function () {
+        resolve(clearPayment(origin, joinerToken));
+      }, 30000);
+    });
+  });
+}
+
 function markPaid(url, joinerToken, amount) {
   var origin = url.split("/").slice(0, 3).join("/");
   return fetch(origin + "/controller/AJAX_joinerMarkPay.php", {
@@ -722,6 +740,7 @@ if (typeof module !== 'undefined') {
     fixDonors,
     markPaid,
     checkPaid,
-    moveFromWaiting
+    moveFromWaiting,
+    clearPayment
   };
 }

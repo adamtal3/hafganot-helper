@@ -197,10 +197,15 @@ async function processExport(password, url, targetId, rerun) {
     throw new Error('Password is required as an argument');
   if (process.argv[5]) {
     var days = parseInt(process.argv[5]);
-    if (days > 0) {
+    if (days > 0 || process.argv[5] === '0') {
       var today = new Date();
       lastRun = new Date();
       lastRun.setDate(today.getDate() - days); // Calculate X days ago
+      // Set to 06:00:00
+      lastRun.setHours(6);
+      lastRun.setMinutes(0);
+      lastRun.setSeconds(0);
+      lastRun.setMilliseconds(0);
     }
   }
   await processExport(atob(password), url, targetId);
