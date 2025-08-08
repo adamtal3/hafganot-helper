@@ -1,3 +1,22 @@
+// Wrapper for fetch with automatic retry (4 retries, 10 seconds wait)
+function fetchWithRetry(url, options, retries = 4, wait = 10000) {
+  return new Promise((resolve, reject) => {
+    function attempt(n) {
+      fetch(url, options)
+        .then(resolve)
+        .catch((error) => {
+          if (n > 0) {
+            log(`fetch failed, retrying in ${wait / 1000} seconds... (${n} retries left)`);
+            setTimeout(() => attempt(n - 1), wait);
+          } else {
+            log('fetch failed after retries');
+            reject(error);
+          }
+        });
+    }
+    attempt(retries);
+  });
+}
 var COST = 50;
 
 function toH1(text) {
@@ -182,7 +201,7 @@ function getStopsDetails(url, line) {
   var origin = url.split("/").slice(0, 3).join("/");
   let cached = cache(busToken);
   if (cached) return Promise.resolve({line, stops: cached});
-  return fetch(origin + "/controller/modals/AJAX_busLocationsModal.php", {
+  return fetchWithRetry(origin + "/controller/modals/AJAX_busLocationsModal.php", {
     method: "POST",
     body: new URLSearchParams({ busToken })
   })
@@ -266,7 +285,7 @@ function getLines(url) {
   //if (cached) return Promise.resolve(cached);
   var eventBusesAdminToken = url.split("?")[1].split("&").find(function(param) { return param.split("=")[0] === "t"; }).split("=")[1];
   var origin = url.split("/").slice(0, 3).join("/");
-  return fetch(origin + "/controller/AJAX_eventBuses.php", {
+  return fetchWithRetry(origin + "/controller/AJAX_eventBuses.php", {
     method: "POST",
     body: new URLSearchParams({ eventBusesAdminToken })
   })
@@ -394,7 +413,7 @@ function getAllPassengers(referrer, eventBusesAdminToken) {
   var url = origin + "/controller/BUS_searchBusesJoinersData.php";
   let cached = cache(url);
   if (cached) return Promise.resolve(cached);
-  return fetch(url, {
+  return fetchWithRetry(url, {
     method: "POST",
     referrer,
     body: new URLSearchParams({ eventBusesAdminToken, search: '05' })
@@ -475,7 +494,7 @@ function addTokens(url, passengers) {
     let cached = cache(stopToken);
     if (cached) return callback(cached, true);
     log('מציאת נוסעים לתחנה: ' + (index + 1) + ' מתוך ' + stopTokens.length);
-    return fetch(origin + "/controller/BUS_locationJoinersData.php", {
+    return fetchWithRetry(origin + "/controller/BUS_locationJoinersData.php", {
         referrer: url,
         method: "POST",
         body: new URLSearchParams({ locationToken: stopToken })
@@ -580,7 +599,7 @@ function fixDonors(donors) {
 }
 
 function moveFromWaiting(origin, joinerToken) {
-  return fetch(origin + "/controller/BUS_noStandbyBusJoiner.php", {
+  return fetchWithRetry(origin + "/controller/BUS_noStandbyBusJoiner.php", {
     method: "POST",
     body: new URLSearchParams({ joinerToken }),
     referrer: origin
@@ -597,7 +616,7 @@ function moveFromWaiting(origin, joinerToken) {
 }
 
 function clearPayment(origin, joinerToken) {
-  return fetch(origin + "/controller/AJAX_joinerCancelPay.php", {
+  return fetchWithRetry(origin + "/controller/AJAX_joinerCancelPay.php", {
     method: "POST",
     body: new URLSearchParams({ joinerToken }),
     referrer: origin
@@ -615,7 +634,7 @@ function clearPayment(origin, joinerToken) {
 
 function markPaid(url, joinerToken, amount) {
   var origin = url.split("/").slice(0, 3).join("/");
-  return fetch(origin + "/controller/AJAX_joinerMarkPay.php", {
+  return fetchWithRetry(origin + "/controller/AJAX_joinerMarkPay.php", {
     method: "POST",
     body: new URLSearchParams({ joinerToken, amount, payTypeID: 4, payVaucher: "JGive (" + amount + "₪)" }),
   }).catch(function(error) {

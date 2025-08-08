@@ -2,17 +2,9 @@ const axios = require('axios');
 const tough = require('tough-cookie');
 const { CookieJar } = tough;
 const { wrapper } = require('axios-cookiejar-support');
-const $ = require('jquery');
 const csv = require('jquery-csv');
-const { fixDonors, getLines, getStops, getPassengers, checkPaid } = require("./app.js");
-
-const GetLastMonday = () => {
-  const today = new Date();
-  const lastMonday = new Date(today);
-  lastMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // Calculate last Monday
-  return lastMonday;
-}
-var lastRun = GetLastMonday();
+const xlsx = require('xlsx');
+const fs = require('fs');
 
 // Enable cookie support for Axios
 const jar = new CookieJar();
@@ -21,26 +13,17 @@ const client = wrapper(axios.create({ jar, withCredentials: true }));
 // Log helper
 const log = (message) => console.log(`[${new Date().toISOString()}] ${message}`);
 
-// Function to calculate date range (last Monday to today)
+let fromDate = new Date();
+fromDate.setDate(fromDate.getDate() - 7);
+
+// Function to calculate date range
 const formatDate = (date) => date.toISOString().split('T')[0];
 const getDateRange = () => {
   return {
-    fromDate: formatDate(lastRun),
+    fromDate: formatDate(fromDate),
     toDate: formatDate(new Date()),
   };
 };
-
-function markPayers(text, url) {
-  var donors = csv.toObjects(text);
-  donors = fixDonors(donors);
-
-  return getLines(url).then(function (lines) {
-    var stops = getStops(lines);
-    return getPassengers(url, stops).then(function (passengers) {
-      return checkPaid(url, donors, passengers);
-    });
-  });
-}
 
 async function wrapGet(url, params) {
   return new Promise((resolve, reject) => {
@@ -57,7 +40,6 @@ async function wrapGet(url, params) {
 
 async function wrapPost(url, data, params) {
   return new Promise((resolve, reject) => {
-    console.log(`Posting to ${url} with data: ${JSON.stringify(data)}, params: ${JSON.stringify(params)}`);
     client.post(url, data, params).then(function (response) {
       resolve(response);
     }).catch(function (error) {
@@ -69,20 +51,8 @@ async function wrapPost(url, data, params) {
   });
 }
 
-async function processExport(password, url, targetId, rerun) {
+async function processExport(password, targetId) {
   try {
-    if (rerun) {
-      // Don't run between 22:00 and 08:00
-      const now = new Date();
-      const hours = now.getHours();
-      if (hours >= 22 || hours < 8) {
-        log(`Skipping. It's between 22:00 and 08:00 - waiting for 1 hour before running again`);
-        setTimeout(function () {
-          processExport(password, url, targetId, true);
-        }, 3600000);
-        return;
-      }
-    }
     // Step 1: Authentication to get x-csrf-token
     log('Authenticating...');
     const authResponse = await wrapPost('https://www.jgive.com/graphql', 
@@ -93,7 +63,6 @@ async function processExport(password, url, targetId, rerun) {
     const csrfToken = authResponse.headers['x-csrf-token'];
     log('Authentication successful');
     log(JSON.stringify(authResponse.data));
-
 
     // Step 2: Request export file for the date range (new API structure)
     const dateRange = getDateRange();
@@ -115,18 +84,7 @@ async function processExport(password, url, targetId, rerun) {
             toDate: dateRange.toDate,
           },
         },
-        query: `mutation RequestDownload($downloadType: DownloadTypesEnum!, $accountId: ID, $corporateDonorId: ID, $dateRange: DateRangeInput, $filter: DownloadFilterInput, $financialFilter: FinancialFilterEnum) {
-  requestDownload(
-    input: {downloadType: $downloadType, accountId: $accountId, corporateDonorId: $corporateDonorId, filter: $filter, financialFilter: $financialFilter, dateRange: $dateRange}
-  ) {
-    downloadObject {
-      id
-      status
-      __typename
-    }
-    __typename
-  }
-}`,
+        query: `mutation RequestDownload($downloadType: DownloadTypesEnum!, $accountId: ID, $corporateDonorId: ID, $dateRange: DateRangeInput, $filter: DownloadFilterInput, $financialFilter: FinancialFilterEnum) {\n  requestDownload(\n    input: {downloadType: $downloadType, accountId: $accountId, corporateDonorId: $corporateDonorId, filter: $filter, financialFilter: $financialFilter, dateRange: $dateRange}\n  ) {\n    downloadObject {\n      id\n      status\n      __typename\n    }\n    __typename\n  }\n}`,
       },
       {
         headers: {
@@ -192,19 +150,33 @@ async function processExport(password, url, targetId, rerun) {
 
       // Get the file as blob
       const fileContent = Buffer.from(fileResponse.data).toString('utf-8'); // Specify encoding as needed
-      markPayers(fileContent, url).then(function (donors) {
-        // Run again in 1 hour
-        log(`Done processing ${donors.length} donors - waiting for 1 hour before running again`);
-        lastRun = new Date();
-        setTimeout(function () {
-          processExport(password, url, targetId, true);
-        }, 3600000);
-      }).catch(function (error) {
-        log(`Error: ${error.message}. Trying again in 5 minutes`);
-        setTimeout(function () {
-          processExport(password, url, targetId, true);
-        }, 300000);
+      var objects = csv.toObjects(fileContent);
+
+      // Filter the following columns only:
+      // id, Transaction Date, Amount, Amount, Currency, Donor First Name, Donor Last Name, Invoice Recipient Name, Donor Email, Donor Phone Number, Comment
+
+      var filteredObjects = objects.map(obj => {
+        return {
+          'Transaction Date': obj['Transaction Date'],
+          Amount: obj['Amount'],
+          Currency: obj['Currency'],
+          'Donor First Name': obj['Donor First Name'],
+          'Donor Last Name': obj['Donor Last Name'],
+          'Invoice Recipient Name': obj['Invoice Recipient Name'],
+          'Donor Email': obj['Donor Email'],
+          'Donor Phone Number': obj['Donor Phone Number'],
+          Comment: obj['Comment']
+        };
       });
+
+      // Convert the filtered objects back to CSV
+      const filteredCsv = csv.fromObjects(filteredObjects);
+      
+      // Now save as xlsx
+      const wb = xlsx.utils.book_new();
+      const ws = xlsx.utils.json_to_sheet(filteredObjects);
+      xlsx.utils.book_append_sheet(wb, ws, 'Sheet1');
+      xlsx.writeFile(wb, 'D:\\jgive-export.xlsx');
     } else {
       throw new Error('File URL not found');
     }
@@ -218,22 +190,16 @@ async function processExport(password, url, targetId, rerun) {
 (async () => {
   // Get password from argument
   const password = process.argv[2];
-  const url = process.argv[3]; // Call with node index.js <encoded_password> <buses_url>
-  const targetId = process.argv[4] || 122602; // Call with node index.js <encoded_password> <buses_url> 122193
+  const targetId = process.argv[3] || 122602; // Call with node index.js <encoded_password> <buses_url> 122193
   if (!password)
     throw new Error('Password is required as an argument');
-  if (process.argv[5]) {
-    var days = parseInt(process.argv[5]);
-    if (days > 0 || process.argv[5] === '0') {
+  if (process.argv.length > 4) {
+    var days = parseInt(process.argv[4]);
+    if (days > 0 || process.argv[4] === '0') {
       var today = new Date();
-      lastRun = new Date();
-      lastRun.setDate(today.getDate() - days); // Calculate X days ago
-      // Set to 06:00:00
-      lastRun.setHours(6);
-      lastRun.setMinutes(0);
-      lastRun.setSeconds(0);
-      lastRun.setMilliseconds(0);
+      fromDate = new Date();
+      fromDate.setDate(today.getDate() - days); // Calculate X days ago
     }
   }
-  await processExport(atob(password), url, targetId);
+  await processExport(atob(password), targetId);
 })();
